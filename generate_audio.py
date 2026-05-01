@@ -34,5 +34,5 @@ for i in range(total_beats):
         audio_track[start:end] += hihat[:min(len(hihat), len(audio_track)-start)]
 
 audio_track = audio_track / np.max(np.abs(audio_track))
-wavfile.write("sample.wav", sr, (audio_track * 32767).astype(np.int16))
-print("sample.wav generated.")
+wavfile.write("data/sample.wav", sr, (audio_track * 32767).astype(np.int16))
+print("data/sample.wav generated.")

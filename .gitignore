@@ -216,3 +216,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Media files
+*.mp4
+*.wav
+*.mp3
+*.m4a
+
+# Output and Data directories
+output/
+data/
