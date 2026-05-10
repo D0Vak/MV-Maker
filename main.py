@@ -5,17 +5,19 @@ from moviepy import VideoClip, AudioFileClip
 import os
 import tkinter as tk
 from tkinter import filedialog, ttk, messagebox
+from PIL import Image, ImageTk
 
 # Modular Imports
 from design_system import DesignTheme, Camera, PostProcessor
 from style_engines import *
 from audio_analyzer import AudioAnalyzer
 from video_compositor import VideoCompositor
+from lyrics_engine import LyricsEngine
 
 class MVMakerEvolution:
-    def __init__(self, audio_path, out_path, style_name="hybrid", theme_name="auto", ratio="16:9", timeline_script="", category="all"):
-        self.audio_path, self.out_path, self.style_name, self.theme_name, self.emotion_name, self.ratio, self.timeline_script, self.category_name = \
-            audio_path, out_path, style_name, theme_name, "auto", ratio, timeline_script, category
+    def __init__(self, audio_path, out_path, style_name="hybrid", theme_name="auto", ratio="16:9", timeline_script="", category="all", use_lyrics=False):
+        self.audio_path, self.out_path, self.style_name, self.theme_name, self.emotion_name, self.ratio, self.timeline_script, self.category_name, self.use_lyrics = \
+            audio_path, out_path, style_name, theme_name, "auto", ratio, timeline_script, category, use_lyrics
         self.pals = {
             "bright": [[(30, 20, 70), (130, 90, 240), (255, 190, 255)], [(15, 45, 55), (40, 200, 140), (160, 255, 240)]],
             "deep": [[(15, 10, 40), (70, 40, 140), (160, 90, 255)], [(30, 15, 20), (160, 70, 40), (255, 130, 90)]]
@@ -36,19 +38,30 @@ class MVMakerEvolution:
             "stormy": StyleStormyLandscape(), "slowmo": StyleRainSlowMo(), "city": StyleCyberCity(),
             "graphic": StyleGraphicArt(), "ink": StyleInkWash(), "grunge": StyleGrungeGrind(), "pop": StylePopDynamic(),
             "story": StyleStorySilhouette(), "melancholy": StyleStormyLandscape(),
-            "manga": StyleMangaLayout(), "action": StyleActionSilhouette()
+            "manga": StyleMangaLayout(), "action": StyleActionSilhouette(),
+            "classic": StyleClassic(), "darkfantasy": StyleDarkFantasy(),
+            "cyberpunk": StyleCyberPunk(), "lofi": StyleLofiChill(),
+            "heavy": StyleHeavyMetal(), "synthwave": StyleSynthWave()
         }
         self.categories = {
             "all": list(self.engines.keys()),
-            "geometric": ["fusion", "geo", "glitch", "graphic", "pop", "liquid"],
-            "anime": ["anime", "story", "city", "stormy", "slowmo", "celestial", "manga", "action"],
-            "artistic": ["ink", "grunge", "liquid"]
+            "geometric": ["fusion", "geo", "glitch", "graphic", "pop", "liquid", "cyberpunk", "synthwave"],
+            "anime": ["anime", "story", "city", "stormy", "slowmo", "celestial", "manga", "action", "darkfantasy", "lofi"],
+            "artistic": ["ink", "grunge", "liquid", "classic", "heavy"]
+        }
+        # Style Pools for Intelligent Selection
+        self.style_pools = {
+            "rough_high": ["heavy", "glitch", "cyberpunk", "grunge"],
+            "smooth_high": ["pop", "synthwave", "action", "geo"],
+            "smooth_low": ["lofi", "slowmo", "ink", "celestial", "liquid"],
+            "detailed_low": ["story", "classic", "anime"],
+            "mid": ["fusion", "city", "graphic", "manga", "stormy", "darkfantasy"]
         }
         self.phase_styles = {
             "geometric": { 1: ["liquid", "fusion"], 2: ["fusion", "geo", "graphic"], 3: ["glitch", "pop", "geo"] },
-            "anime": { 1: ["slowmo", "story", "ink", "celestial"], 2: ["anime", "city", "stormy"], 3: ["action", "manga", "grunge"] },
-            "artistic": { 1: ["ink", "liquid"], 2: ["ink", "grunge"], 3: ["grunge", "glitch"] },
-            "all": { 1: ["slowmo", "ink", "liquid", "celestial", "story"], 2: ["anime", "fusion", "city", "geo", "graphic"], 3: ["action", "manga", "glitch", "pop", "grunge"] }
+            "anime": { 1: ["slowmo", "story", "ink", "celestial"], 2: ["anime", "city", "stormy"], 3: ["action", "manga", "grunge", "darkfantasy"] },
+            "artistic": { 1: ["ink", "liquid"], 2: ["ink", "grunge", "classic"], 3: ["grunge", "glitch", "classic"] },
+            "all": { 1: ["slowmo", "ink", "liquid", "celestial", "story"], 2: ["anime", "fusion", "city", "geo", "graphic", "classic"], 3: ["action", "manga", "glitch", "pop", "grunge", "darkfantasy"] }
         }
         self.emotions = {
             "joy": ["pop", "anime", "graphic"], "sadness": ["melancholy", "ink", "slowmo"],
@@ -60,7 +73,17 @@ class MVMakerEvolution:
         # 1. Audio Analysis
         data = AudioAnalyzer.analyze(self.audio_path)
         
-        # 2. Theme Selection
+        # 2. Lyrics Extraction (NEW)
+        lyrics_segments = None
+        if self.use_lyrics:
+            try:
+                engine = LyricsEngine(model_size="base")
+                lyrics_segments = engine.extract_lyrics(self.audio_path)
+            except Exception as e:
+                print(f"Lyrics Error: {e}")
+                messagebox.showwarning("Lyrics Error", f"Could not generate lyrics: {e}")
+
+        # 3. Theme Selection
         detected_theme = "vivid"
         if data["zcr"] > 0.08 or data["flatness"] > 0.04: detected_theme = "grunge"
         elif data["rolloff"] < 3000 and data["flatness"] < 0.01: detected_theme = "ink"
@@ -88,27 +111,43 @@ class MVMakerEvolution:
             # In a full implementation, we'd sync markers to beats here
             pass
 
-        # 4. Engine Selector Logic
+        # 4. Engine Selector Logic (INTELLIGENT)
         def engine_selector(t, idx, s_idx, phase):
             palette = active_pals[s_idx % 2]
-            emotion = self.emotion_name if self.emotion_name != "auto" else detected_theme
-            base_styles = self.emotions.get(emotion, self.categories["all"])
             
             if manual_timeline and s_idx < len(manual_timeline):
                 engine_key = manual_timeline[s_idx][1]
+            elif self.style_name != "hybrid":
+                engine_key = self.style_name
             else:
-                cat_map = self.phase_styles.get(self.category_name, self.phase_styles["all"])
-                phase_options = cat_map.get(phase, cat_map[2])
-                mood_styles = [s for s in base_styles if s in phase_options]
-                if not mood_styles: mood_styles = phase_options
-                engine_key = mood_styles[s_idx % len(mood_styles)]
+                # Intelligent Auto-Selection
+                feat = data["section_features"][s_idx]
+                zcr_high = feat["zcr"] > data["zcr"] * 1.2
+                flat_high = feat["flat"] > data["flatness"] * 1.2
+                
+                if phase == 3:
+                    pool = self.style_pools["rough_high"] if (zcr_high or flat_high) else self.style_pools["smooth_high"]
+                elif phase == 1:
+                    pool = self.style_pools["smooth_low"] if not (zcr_high or flat_high) else self.style_pools["detailed_low"]
+                else:
+                    pool = self.style_pools["mid"]
+                
+                # Filter by category if needed
+                if self.category_name != "all":
+                    cat_styles = self.categories.get(self.category_name, [])
+                    pool = [s for s in pool if s in cat_styles]
+                    if not pool: pool = self.categories[self.category_name]
+                
+                # Use a stable hash-based selection to keep the style consistent within the section
+                np.random.seed(s_idx + 42)
+                engine_key = np.random.choice(pool)
             
             return self.engines.get(engine_key, self.engines["fusion"]), palette
 
         # 5. Render
         vw, vh = (1280, 720) if self.ratio == "16:9" else (720, 1280)
         compositor = VideoCompositor(vw, vh)
-        make_frame, duration = compositor.render(data, engine_selector, self.camera, theme, self.audio_path, self.ratio)
+        make_frame, duration = compositor.render(data, engine_selector, self.camera, theme, self.audio_path, self.ratio, lyrics_segments=lyrics_segments)
         
         v = VideoClip(make_frame, duration=duration).with_audio(AudioFileClip(self.audio_path))
         v.write_videofile(self.out_path, fps=30, codec="libx264", audio_codec="aac")
@@ -125,8 +164,9 @@ class EvolutionApp:
         self.theme = tk.StringVar(value="auto")
         self.emotion = tk.StringVar(value="auto")
         self.ratio = tk.StringVar(value="16:9")
+        self.use_lyrics = tk.BooleanVar(value=False)
         
-        ttk.Label(root, text="MV-Maker: MODULAR STUDIO", font=("Helvetica", 20, "bold")).pack(pady=10)
+        ttk.Label(root, text="MV-Maker: MODULAR STUDIO V2", font=("Helvetica", 20, "bold")).pack(pady=10)
         ttk.Button(root, text="Select Audio", command=lambda: self.file_path.set(filedialog.askopenfilename())).pack(pady=5)
         ttk.Label(root, textvariable=self.file_path).pack()
         
@@ -138,7 +178,14 @@ class EvolutionApp:
         f1 = ttk.Frame(root); f1.pack(pady=5, fill="x", padx=20)
         ttk.Label(f1, text="Style:").pack(side="left")
         self.style_combo = ttk.Combobox(f1, textvariable=self.style)
-        self.style_combo.pack(side="left", padx=5); self.update_styles()
+        self.style_combo.pack(side="left", padx=5)
+        self.style_combo.bind("<<ComboboxSelected>>", self.show_preview)
+
+        # Preview Image Area (Define this BEFORE calling update_styles)
+        self.preview_label = ttk.Label(root)
+        self.preview_label.pack(pady=10)
+
+        self.update_styles()
 
         f2 = ttk.Frame(root); f2.pack(pady=5, fill="x", padx=20)
         ttk.Label(f2, text="Design:").pack(side="left")
@@ -152,6 +199,8 @@ class EvolutionApp:
         ttk.Label(f3, text="Ratio:").pack(side="left")
         ttk.Combobox(f3, textvariable=self.ratio, values=["16:9", "9:16"]).pack(side="left", padx=5)
 
+        ttk.Checkbutton(root, text="Auto Lyrics (OpenAI Whisper)", variable=self.use_lyrics).pack(pady=5)
+
         ttk.Label(root, text="Timeline Script:").pack()
         self.script_text = tk.Text(root, height=10, width=50)
         self.script_text.pack(pady=5)
@@ -164,12 +213,27 @@ class EvolutionApp:
         valid_styles = ["hybrid"] + dummy.categories.get(self.category.get(), [])
         self.style_combo['values'] = valid_styles
         if self.style.get() not in valid_styles: self.style.set("hybrid")
+        self.show_preview()
+
+    def show_preview(self, event=None):
+        style = self.style.get()
+        path = f"assets/previews/{style}.png"
+        if not os.path.exists(path):
+            path = "assets/previews/placeholder.png"
+        
+        try:
+            img = Image.open(path)
+            img = img.resize((320, 180), Image.Resampling.LANCZOS)
+            self.photo = ImageTk.PhotoImage(img)
+            self.preview_label.config(image=self.photo)
+        except:
+            self.preview_label.config(image='', text="No Preview Available")
 
     def run(self):
         p = self.file_path.get()
         if p:
             out = os.path.join("output", f"{os.path.basename(p).split('.')[0]}_evolution.mp4")
-            mv = MVMakerEvolution(p, out, self.style.get(), self.theme.get(), self.ratio.get(), self.script_text.get("1.0", "end"), self.category.get())
+            mv = MVMakerEvolution(p, out, self.style.get(), self.theme.get(), self.ratio.get(), self.script_text.get("1.0", "end"), self.category.get(), self.use_lyrics.get())
             mv.emotion_name = self.emotion.get()
             mv.create()
             messagebox.showinfo("Done", f"Evolution complete: {out}")

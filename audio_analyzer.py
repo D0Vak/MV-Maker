@@ -53,9 +53,20 @@ class AudioAnalyzer:
         p1_t, p2_t = sorted_e[len(sorted_e)//3], sorted_e[2*len(sorted_e)//3]
         section_phases = [(1 if e <= p1_t else 2 if e <= p2_t else 3) for e in sec_energies]
 
+        # 5. Section Specific Features (NEW)
+        zcr_raw = librosa.feature.zero_crossing_rate(y=y, hop_length=hop)[0]
+        flatness_raw = librosa.feature.spectral_flatness(y=y, hop_length=hop)[0]
+        section_features = []
+        for i in range(len(markers)-1):
+            m_start, m_end = markers[i], markers[i+1]
+            section_features.append({
+                "zcr": float(np.mean(zcr_raw[m_start:m_end])),
+                "flat": float(np.mean(flatness_raw[m_start:m_end]))
+            })
+
         return {
             "y": y, "sr": sr, "duration": duration, "tempo": tempo, "beats": beats,
             "pb": pb, "hm": hm, "mel_p": mel_p, "mel_e": mel_e, "sub_e": sub_e,
-            "markers": markers, "section_phases": section_phases,
+            "markers": markers, "section_phases": section_phases, "section_features": section_features,
             "zcr": zcr, "flatness": flatness, "rolloff": rolloff, "centroid": centroid
         }

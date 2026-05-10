@@ -45,7 +45,7 @@ class StyleAnimePlus:
             tr = w + 500
             cx = (np.random.randint(0, tr) + int(t * spd)) % tr - 500
             cy = np.random.randint(50, h // 2)
-            cv2.circle(frame, (int(cx)), cy, 70, [int(c * 0.45) for c in pal[2]], -1)
+            cv2.circle(frame, (int(cx), cy), 70, [int(c * 0.45) for c in pal[2]], -1)
             cv2.circle(frame, (int(cx)+50, cy+15), 50, [int(c * 0.45) for c in pal[2]], -1)
         # 3. Weather
         if phase >= 3 and intensity > 0.7:
@@ -397,6 +397,150 @@ class StyleActionSilhouette:
             cv2.line(frame, (cx, cy - 100), (cx + 150, cy - 150), color, 15)
             if pb > 0.8:
                 cv2.line(frame, (cx - 100, cy - 200), (cx + 200, cy - 100), (255, 255, 255), 5)
+
+    def draw_center(self, frame, r, pal, theme, phase, t):
+        pass
+
+class StyleClassic:
+    def draw(self, frame, t, pal, intensity, pb, hm, se, mel_p, mel_e, mode, phase, theme):
+        h, w = frame.shape[:2]
+        c_bg = [int(c * 0.15) for c in pal[0]]
+        frame[:, :] = c_bg
+        border = 40
+        c_gold = (100, 180, 210) 
+        cv2.rectangle(frame, (border, border), (w-border, h-border), c_gold, 2)
+        cv2.rectangle(frame, (border+10, border+10), (w-border-10, h-border-10), c_gold, 1)
+        for i in range(10 + phase * 5):
+            np.random.seed(i * 77)
+            x = (np.random.randint(0, w) + int(t * 50)) % w
+            y = np.random.randint(border, h - border)
+            cv2.circle(frame, (x, y), 5, c_gold, -1)
+            cv2.line(frame, (x+5, y), (x+5, y-30), c_gold, 2)
+            if i % 3 == 0:
+                cv2.line(frame, (x+5, y-30), (x+15, y-20), c_gold, 2)
+
+    def draw_center(self, frame, r, pal, theme, phase, t):
+        cx, cy = frame.shape[1]//2, frame.shape[0]//2
+        pts = np.array([[cx-20, cy+40], [cx+20, cy+40], [cx+40, cy-20], [cx, cy-40], [cx-40, cy-20]], np.int32)
+        cv2.polylines(frame, [pts], True, (100, 180, 210), 2)
+        cv2.circle(frame, (cx, cy), r, (100, 180, 210), 1)
+
+class StyleDarkFantasy:
+    def draw(self, frame, t, pal, intensity, pb, hm, se, mel_p, mel_e, mode, phase, theme):
+        h, w = frame.shape[:2]
+        frame[:, :] = (5, 0, 10) 
+        cx, cy = w//2, h//2
+        r_base = int(200 + 100 * np.sin(t * 0.5))
+        cv2.circle(frame, (cx, cy), r_base, (40, 20, 80), 2, cv2.LINE_AA)
+        for i in range(3):
+            a = t + i * 2 * np.pi / 3
+            cv2.line(frame, (cx, cy), (int(cx + r_base * np.cos(a)), int(cy + r_base * np.sin(a))), (60, 30, 100), 1)
+        for i in range(40 + phase * 20):
+            np.random.seed(i * 13)
+            px = np.random.randint(0, w)
+            py = (np.random.randint(0, h) - int(t * 100)) % h
+            size = np.random.randint(1, 4)
+            c_ember = (20, 20, 200) if np.random.random() > 0.5 else (80, 40, 150)
+            cv2.circle(frame, (px, py), size, c_ember, -1)
+        if pb > 0.8:
+            overlay = frame.copy()
+            cv2.circle(overlay, (cx, cy), int(r_base * 1.5), (0, 0, 0), -1)
+            cv2.addWeighted(overlay, 0.3 * intensity, frame, 0.7, 0, dst=frame)
+
+    def draw_center(self, frame, r, pal, theme, phase, t):
+        cx, cy = frame.shape[1]//2, frame.shape[0]//2
+        for i in range(8):
+            a = i * np.pi / 4 + t
+            cv2.putText(frame, "V", (int(cx + r * np.cos(a)), int(cy + r * np.sin(a))), 
+                        cv2.FONT_HERSHEY_SCRIPT_SIMPLEX, 0.5, (100, 50, 255), 1)
+        cv2.circle(frame, (cx, cy), r, (150, 50, 200), 2)
+
+class StyleCyberPunk:
+    def draw(self, frame, t, pal, intensity, pb, hm, se, mel_p, mel_e, mode, phase, theme):
+        h, w = frame.shape[:2]
+        frame[:, :] = (20, 10, 10)
+        # 1. Digital Grid
+        for i in range(0, w, 40): cv2.line(frame, (i, 0), (i, h), (40, 20, 40), 1)
+        for i in range(0, h, 40): cv2.line(frame, (0, i), (w, i), (40, 20, 40), 1)
+        # 2. Scanning Bars
+        sy = int(t * 200) % h
+        cv2.line(frame, (0, sy), (w, sy), (100, 255, 255), 2)
+        # 3. Random Tech Boxes
+        for i in range(int(5 * intensity)):
+            np.random.seed(i + int(t * 5))
+            x, y = np.random.randint(0, w), np.random.randint(0, h)
+            cv2.rectangle(frame, (x, y), (x+50, y+50), (255, 0, 255), 1)
+            cv2.putText(frame, "SYSTEM_LINK", (x, y-5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 255), 1)
+
+    def draw_center(self, frame, r, pal, theme, phase, t):
+        cx, cy = frame.shape[1]//2, frame.shape[0]//2
+        cv2.rectangle(frame, (cx-r, cy-r), (cx+r, cy+r), (0, 255, 255), 2)
+        cv2.circle(frame, (cx, cy), int(r*0.5), (255, 0, 255), -1)
+
+class StyleLofiChill:
+    def draw(self, frame, t, pal, intensity, pb, hm, se, mel_p, mel_e, mode, phase, theme):
+        h, w = frame.shape[:2]
+        frame[:, :] = (180, 160, 160) # Warm sepia
+        # 1. Dust & Scratches
+        for _ in range(int(10 * intensity)):
+            x, y = np.random.randint(0, w), np.random.randint(0, h)
+            cv2.circle(frame, (x, y), 1, (100, 100, 100), -1)
+        # 2. Spinning Record Shadow
+        cx, cy = w-200, h-200
+        cv2.circle(frame, (cx, cy), 150, (50, 50, 50), -1)
+        cv2.circle(frame, (cx, cy), 155, (200, 180, 180), 2)
+        # 3. Soft Floating Circles
+        for i in range(5):
+            np.random.seed(i)
+            ox, oy = int(100 * np.cos(t*0.5 + i)), int(100 * np.sin(t*0.4 + i))
+            cv2.circle(frame, (w//2 + ox, h//2 + oy), 100, (220, 200, 200), -1)
+
+    def draw_center(self, frame, r, pal, theme, phase, t):
+        pass
+
+class StyleHeavyMetal:
+    def draw(self, frame, t, pal, intensity, pb, hm, se, mel_p, mel_e, mode, phase, theme):
+        h, w = frame.shape[:2]
+        frame[:, :] = (10, 10, 10)
+        # 1. Jagged Shards
+        for i in range(10 + int(20 * pb)):
+            np.random.seed(i + int(t * 10))
+            pts = np.array([[np.random.randint(0, w), np.random.randint(0, h)] for _ in range(3)], np.int32)
+            cv2.fillPoly(frame, [pts], (40, 40, 120) if np.random.random() > 0.5 else (20, 20, 60))
+        # 2. Fire Sparks
+        for i in range(50):
+            np.random.seed(i * 12)
+            sx = np.random.randint(0, w)
+            sy = (np.random.randint(0, h) - int(t * 800)) % h
+            cv2.line(frame, (sx, sy), (sx, sy+20), (50, 100, 255), 2) # Blue fire sparks
+        # 3. Visual Shake is handled by Camera, but we add static noise
+        noise = np.random.randint(0, 50, frame.shape, dtype=np.uint8)
+        cv2.add(frame, noise, dst=frame)
+
+    def draw_center(self, frame, r, pal, theme, phase, t):
+        cx, cy = frame.shape[1]//2, frame.shape[0]//2
+        cv2.polylines(frame, [np.array([[cx-r, cy], [cx, cy-r], [cx+r, cy], [cx, cy+r]], np.int32)], True, (100, 150, 255), 4)
+
+class StyleSynthWave:
+    def draw(self, frame, t, pal, intensity, pb, hm, se, mel_p, mel_e, mode, phase, theme):
+        h, w = frame.shape[:2]
+        # 1. Gradient Sunset
+        for y in range(h):
+            c = (255 * (y/h), 0, 255 * (1 - y/h)) # Pink to Blue
+            frame[y, :] = [int(x * 0.3) for x in c]
+        # 2. Perspected Grid
+        cx, cy = w//2, h//2
+        for i in range(-10, 11):
+            cv2.line(frame, (cx + i * 100, cy), (cx + i * 1000, h), (255, 0, 255), 1)
+        for i in range(10):
+            gy = cy + int(pow(i/10, 2) * (h - cy))
+            cv2.line(frame, (0, gy), (w, gy), (255, 0, 255), 1)
+        # 3. Big Sun
+        sun_r = 150 + int(20 * pb)
+        cv2.circle(frame, (cx, cy - 50), sun_r, (0, 100, 255), -1)
+        for i in range(5):
+            sy = cy - 50 + 40 * i
+            cv2.line(frame, (cx-sun_r, sy), (cx+sun_r, sy), (20, 10, 10), 4)
 
     def draw_center(self, frame, r, pal, theme, phase, t):
         pass
