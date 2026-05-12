@@ -15,9 +15,10 @@ from video_compositor import VideoCompositor
 from lyrics_engine import LyricsEngine
 
 class MVMakerEvolution:
-    def __init__(self, audio_path, out_path, style_name="hybrid", theme_name="auto", ratio="16:9", timeline_script="", category="all", use_lyrics=False):
+    def __init__(self, audio_path, out_path, style_name="hybrid", theme_name="auto", ratio="16:9", timeline_script="", category="all", use_lyrics=False, base_visual_path=""):
         self.audio_path, self.out_path, self.style_name, self.theme_name, self.emotion_name, self.ratio, self.timeline_script, self.category_name, self.use_lyrics = \
             audio_path, out_path, style_name, theme_name, "auto", ratio, timeline_script, category, use_lyrics
+        self.base_visual_path = base_visual_path
         self.pals = {
             "bright": [[(30, 20, 70), (130, 90, 240), (255, 190, 255)], [(15, 45, 55), (40, 200, 140), (160, 255, 240)]],
             "deep": [[(15, 10, 40), (70, 40, 140), (160, 90, 255)], [(30, 15, 20), (160, 70, 40), (255, 130, 90)]]
@@ -147,7 +148,7 @@ class MVMakerEvolution:
         # 5. Render
         vw, vh = (1280, 720) if self.ratio == "16:9" else (720, 1280)
         compositor = VideoCompositor(vw, vh)
-        make_frame, duration = compositor.render(data, engine_selector, self.camera, theme, self.audio_path, self.ratio, lyrics_segments=lyrics_segments)
+        make_frame, duration = compositor.render(data, engine_selector, self.camera, theme, self.audio_path, self.ratio, lyrics_segments=lyrics_segments, base_visual_path=self.base_visual_path)
         
         v = VideoClip(make_frame, duration=duration).with_audio(AudioFileClip(self.audio_path))
         v.write_videofile(self.out_path, fps=30, codec="libx264", audio_codec="aac")
@@ -157,8 +158,9 @@ class EvolutionApp:
     def __init__(self, root):
         self.root = root
         self.root.title("MV-Maker Evolution V2 (Modular)")
-        self.root.geometry("500x750")
+        self.root.geometry("500x800")
         self.file_path = tk.StringVar()
+        self.visual_path = tk.StringVar()
         self.category = tk.StringVar(value="all")
         self.style = tk.StringVar(value="hybrid")
         self.theme = tk.StringVar(value="auto")
@@ -169,6 +171,9 @@ class EvolutionApp:
         ttk.Label(root, text="MV-Maker: MODULAR STUDIO V2", font=("Helvetica", 20, "bold")).pack(pady=10)
         ttk.Button(root, text="Select Audio", command=lambda: self.file_path.set(filedialog.askopenfilename())).pack(pady=5)
         ttk.Label(root, textvariable=self.file_path).pack()
+        
+        ttk.Button(root, text="Select Base Visual (Opt)", command=lambda: self.visual_path.set(filedialog.askopenfilename())).pack(pady=5)
+        ttk.Label(root, textvariable=self.visual_path).pack()
         
         f0 = ttk.Frame(root); f0.pack(pady=5, fill="x", padx=20)
         ttk.Label(f0, text="Category:").pack(side="left")
@@ -233,7 +238,7 @@ class EvolutionApp:
         p = self.file_path.get()
         if p:
             out = os.path.join("output", f"{os.path.basename(p).split('.')[0]}_evolution.mp4")
-            mv = MVMakerEvolution(p, out, self.style.get(), self.theme.get(), self.ratio.get(), self.script_text.get("1.0", "end"), self.category.get(), self.use_lyrics.get())
+            mv = MVMakerEvolution(p, out, self.style.get(), self.theme.get(), self.ratio.get(), self.script_text.get("1.0", "end"), self.category.get(), self.use_lyrics.get(), self.visual_path.get())
             mv.emotion_name = self.emotion.get()
             mv.create()
             messagebox.showinfo("Done", f"Evolution complete: {out}")
